@@ -13,10 +13,10 @@
 ###
 
 
-@Parties = new Meteor.Collections('parties')
+@Parties = new Meteor.Collection('parties')
 
 
-@Parties.allow
+Parties.allow
     insert: (userId, party) ->
         return false
 
@@ -31,10 +31,10 @@
         return true
 
     remove: (userId, party) ->
-        return party.owner is userId && attending(party) is 0
+        return party.owner is userId && @attending(party) is 0
 
 
-attending = (party) ->
+@attending = (party) ->
     return (_.groupBy(party.rsvps, 'rsvp').yes || []).length
 
 NonEmptyString = Match.Where((x) ->
@@ -47,13 +47,13 @@ Coordinate = Match.Where((x) ->
     return x >= 0 && x <= 1
 )
 
-createParty = (options) ->
+@createParty = (options) ->
     id = Random.id()
     Meteor.call('createParty', _.extend({_id: id}, options))
     return id
 
 Meteor.methods
-    createParty: ->
+    createParty: (options) ->
         check(options, {
             title: NonEmptyString,
             description: NonEmptyString,
@@ -61,7 +61,7 @@ Meteor.methods
             y: Coordinate,
             public: Match.Optional(Boolean),
             _id: Match.Optional(NonEmptyString)
-            })
+        })
 
         if options.title.length > 100
             throw new meteor.error(413, 'title too long')
@@ -71,14 +71,14 @@ Meteor.methods
             throw new Meteor.Error(403, 'U must be logged in')
 
         id = options._id || Random.id()
-        @Parties.insert
+        Parties.insert
             _id: id,
             owner: @userId,
             x: options.x,
             y: options.y,
             title: options.title,
             description: options.description,
-            public: !!options.public,
+            public: !! options.public,
             invited: [],
             rsvps: []
 
@@ -88,14 +88,14 @@ Meteor.methods
         check(partyId, String)
         check(userId, String)
 
-        party = @Parties.findOne(partyId)
+        party = Parties.findOne(partyId)
         if  not party || party.owner isnt @userId
             throw new Meteor.Error(404, 'No such party')
         if party.public
             throw new Meteor.Error(400, 'Throw party is public, no need to invite people')
 
         if userId isnt party.owner && not _.contains(party.invited, userId)
-            @Parties.update(partyId, {$addToSet: {invited: userId}})
+            Parties.update(partyId, {$addToSet: {invited: userId}})
 
             from = contactEmail(Meteor.users.findOne(@userId))
             to = contactemail(Meteor.users.findOne(userId))
@@ -116,7 +116,7 @@ Meteor.methods
             throw new Meteor.Error(403, 'U must be logged in to RSVP')
         if not _.contains(['yes', 'no', 'maybe'], rsvp)
             throw new Meteor.Error(400, 'Invalid RSVP')
-        party = @Parties.findOne(partyId)
+        party = Parties.findOne(partyId)
         if not party
             throw new Meteor.Error(404, 'no such party')
         if not party.public && party.owner isnt @userId && not _.contains(party.invited, @userId)
@@ -125,21 +125,21 @@ Meteor.methods
         rsvpIndex = _.indexOf(_.pluck(party.rsvps, 'user'), @userId)
         if rsvpIndex isnt -1
             if Meteor.isServer
-                @Parties.update(
+                Parties.update(
                     {_id: partyId, 'rsvps.user': @userId}, 
                     {$set: {'rsvps.$.rsvp': rsvp}}
                 )
             else
                 modifier = {$set: {}}
                 modifier.$set['rsvps.#{rsvpIndex}.rsvp'] = rsvp
-                @Parties.update(partyId, modifier)
+                Parties.update(partyId, modifier)
 
         else
-            @Parties.update(partyId, {$push: {rsvps: {user: @userId, rsvp: rsvp}}})
+            Parties.update(partyId, {$push: {rsvps: {user: @userId, rsvp: rsvp}}})
 
 #user
 
-displayName = (user) ->
+@displayName = (user) ->
 
     if user.profile && user.profile.name then return user.profile.name else return user.emails[0].address
     #if user.profile && user.profile.name then user.profile.name else user.emails[0].address
