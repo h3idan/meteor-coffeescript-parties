@@ -6,17 +6,15 @@ Meteor.subscribe("parties")
 
 
 # if no party selected, or if the selected party was deleted, select one
-Meteor.startup( ->
-    Deps.autorun( ->
+Meteor.startup ->
+    Meteor.autorun ->
         selected = Session.get('selected')
-        if !selected || Parties.findOne(selected)
-            party = Parties.findOne();
+        if not selected or Parties.findOne(selected)
+            party = Parties.findOne()
             if party
-                Session.set('selected', party._id);
+                Session.set('selected', party._id)
             else
                 Session.set('selected', null)
-    )
-)
 
 
 # party 内容工具条
@@ -34,11 +32,12 @@ Template.details.creatorName = ->
     displayName(owner)
 
 Template.details.canRemove = ->
-    @owner is Meteor.userId() && attending(@) is 0
+    @owner is Meteor.userId() and attending(this) is 0
 
 Template.details.maybeChosen = (what) ->
-    myRsvp = _.find(@rsvps, (r) -> r.user is Meteor.userId()) || {}
-    what is if myRsvp.rsvp then 'chosen btn-inverse' else ''
+    myRsvp = _.find(@rsvps, (r) -> r.user is Meteor.userId()) or {}
+    #what is if myRsvp.rsvp then 'chosen btn-inverse' else ''
+    (if what is myRsvp.rsvp then "chosen btn-inverse" else "")
 
 Template.details.events = ->
     'click .rsvp_yes': ->
@@ -76,16 +75,16 @@ Template.attendance.outstandingInvitations = ->
     ]})
 
 Template.attendance.invitationName = ->
-    displayName(@)
+    displayName(this)
 
 Template.attendance.rsvpIs = (what) ->
     @rsvp is what
 
 Template.attendance.nobody = ->
-    ! @public && @rsvps.length + @invited.length is 0
+    not @public and @rsvps.length + @invited.length is 0
 
 Template.attendance.canInvite = ->
-    ! @public && @owner is Meteor.userId()
+    not @public and @owner is Meteor.userId()
 
 
 # map display
@@ -95,15 +94,15 @@ Template.attendance.canInvite = ->
 coordsRelativeToElement = (element, event) ->
     offset = $(element).offset()
     x = event.pageX - offset.left
-    y = event.pageY - offset.toy
+    y = event.pageY - offset.top
     {x: x, y: y}
 
-Template.map.events = ->
+Template.map.events
     'mousedown circle, mousedown text': (event, template) ->
         Session.set('selected', event.currentTarget.id)
 
     'dblclick .map': (event, template) ->
-        if ! Meteor.userId()
+        if not Meteor.userId()
             return
         coords = coordsRelativeToElement(event.currentTarget, event)
         openCreateDialog(coords.x / 500, coords.y / 500)
@@ -112,10 +111,10 @@ Template.map.rendered = ->
     self = this
     self.node = self.find('svg')
 
-    if ! self.handle
+    if not self.handle
         self.handle = Deps.autorun(->
             selected = Session.get('selected')
-            selectedParty = selected && Parties.findOne(selected)
+            selectedParty = selected and Parties.findOne(selected)
             radius = (party) ->
                 10 + Math.sqrt(attending(party)) * 10
 
@@ -165,7 +164,7 @@ Template.map.rendered = ->
 
 
 Template.map.destroyed = ->
-    @handle && @handle.stop()
+    @handle and @handle.stop()
 
 
 # create Party dialog
@@ -173,7 +172,8 @@ Template.map.destroyed = ->
 openCreateDialog = (x, y) ->
     Session.set('createCoords', {x: x, y: y})
     Session.set('createError', null)
-    Session.set('showCreateDialog', True)
+    #Session.set('showCreateDialog', True)
+    Session.set('showCreateDialog', true)
 
 Template.page.showCreateDialog = ->
     Session.get('showCreateDialog')
@@ -182,20 +182,22 @@ Template.createDialog.events = ->
     'click .save': (event, template) ->
         title = template.find('.title').value
         description = template.find('.description').value
-        public_var = ! template.find('.private').checked
+        public_var = not template.find('.private').checked
         coords = Session.get('cteateCoords')
 
-    if title.length && description.length
-        id = crateParty({
-            title: title,
-            description: description,
-            x: coords.x,
-            y: coords.y,
-            public: public_var,
-        })
-        Session.set('selected', id)
-        if ! public_var && Meteor.users.find().count > 1
-            openInviteDialog()
+        if title.length and description.length
+            id = {
+                title: title,
+                description: description,
+                x: coords.x,
+                y: coords.y,
+                public: public_var,
+                }
+            Meteor.call('createParty', id, (errors, party) ->
+                    unless errors
+                        Session.set('selected', party)
+                        openInviteDialog() if not public_var and Meteor.users.find().count() > 1
+            )
             Session.set('showCreateDialog', false)
         else
             Session.set('createError', 'it needs a title and a description, or why bother?')
@@ -227,7 +229,7 @@ Template.inviteDialog.events({
 
 Template.inviteDialog.uninvited = ->
     party = Parties.findOne(Session.get('selected'))
-    if ! party
+    if not party
         return []
     Meteor.users.find({$nor: [
         {_id: {$in: party.invited}},
@@ -235,4 +237,4 @@ Template.inviteDialog.uninvited = ->
     ]})
 
 Template.inviteDialog.displayName = ->
-    displayname(@)
+    displayname(this)
