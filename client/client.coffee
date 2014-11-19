@@ -7,7 +7,7 @@ Meteor.subscribe("parties")
 
 # if no party selected, or if the selected party was deleted, select one
 Meteor.startup ->
-    Meteor.autorun ->
+    Dps.autorun ->
         selected = Session.get('selected')
         if not selected or Parties.findOne(selected)
             party = Parties.findOne()
@@ -39,7 +39,7 @@ Template.details.maybeChosen = (what) ->
     #what is if myRsvp.rsvp then 'chosen btn-inverse' else ''
     (if what is myRsvp.rsvp then "chosen btn-inverse" else "")
 
-Template.details.events = ->
+Template.details.events
     'click .rsvp_yes': ->
         Meteor.call('rsvp', Session.get('selected'), 'yes')
         false
@@ -57,7 +57,7 @@ Template.details.events = ->
         false
 
     'click .remove': ->
-        Parties.remove(@._id)
+        Parties.remove(@_id)
         false
 
 
@@ -88,7 +88,6 @@ Template.attendance.canInvite = ->
 
 
 # map display
-# 
 # use jquery to get postion clicked relative to the map element
 
 coordsRelativeToElement = (element, event) ->
@@ -172,32 +171,29 @@ Template.map.destroyed = ->
 openCreateDialog = (x, y) ->
     Session.set('createCoords', {x: x, y: y})
     Session.set('createError', null)
-    #Session.set('showCreateDialog', True)
     Session.set('showCreateDialog', true)
 
 Template.page.showCreateDialog = ->
     Session.get('showCreateDialog')
 
-Template.createDialog.events = ->
+Template.createDialog.events
     'click .save': (event, template) ->
         title = template.find('.title').value
         description = template.find('.description').value
         public_var = not template.find('.private').checked
-        coords = Session.get('cteateCoords')
+        coords = Session.get('createCoords')
 
         if title.length and description.length
-            id = {
+            id = createParty(
                 title: title,
                 description: description,
                 x: coords.x,
                 y: coords.y,
                 public: public_var,
-                }
-            Meteor.call('createParty', id, (errors, party) ->
-                    unless errors
-                        Session.set('selected', party)
-                        openInviteDialog() if not public_var and Meteor.users.find().count() > 1
             )
+
+            Session.set('selected', id)
+            openInviteDialog() if not public_var and Meteor.users.find().count() > 1
             Session.set('showCreateDialog', false)
         else
             Session.set('createError', 'it needs a title and a description, or why bother?')
@@ -218,14 +214,13 @@ openInviteDialog = ->
 Template.page.showInviteDialog = ->
     Session.get('showInviteDialog')
 
-Template.inviteDialog.events({
+Template.inviteDialog.events
     'click .invite': (event, template) ->
         Meteor.call('invite', Session.get('selected'), @_id)
 
     'click .done': (event, template) ->
         Session.set('showInviteDialog', false)
         false
-})
 
 Template.inviteDialog.uninvited = ->
     party = Parties.findOne(Session.get('selected'))
